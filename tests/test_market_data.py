@@ -86,3 +86,21 @@ def test_resolve_instrument_token_cached_after_first_lookup():
     market_data.resolve_instrument_token("INFY")
     client._instruments = []  # simulate the API becoming unavailable
     assert market_data.resolve_instrument_token("INFY") == 1
+
+def test_resolve_instrument_token_malformed_row_raises_data_unavailable():
+    # Instrument row missing "tradingsymbol" key
+    client = FakeKiteClient(instruments=[{"instrument_token": 1}])
+    market_data = KiteMarketData(client)
+    with pytest.raises(DataUnavailableError):
+        market_data.resolve_instrument_token("INFY")
+
+def test_get_daily_bar_malformed_candle_raises_data_unavailable():
+    # Candles missing "close" key
+    candles = [{"open": 100.0, "high": 101.0, "low": 99.0} for _ in range(50)]
+    client = FakeKiteClient(
+        instruments=[{"tradingsymbol": "INFY", "instrument_token": 1}],
+        candles=candles,
+    )
+    market_data = KiteMarketData(client)
+    with pytest.raises(DataUnavailableError):
+        market_data.get_daily_bar("INFY", date(2026, 1, 5))

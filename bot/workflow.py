@@ -51,3 +51,38 @@ def process_exits(storage, market_data, executor, today: str, config) -> dict:
 
     return {"executed_exits": executed_exits, "newly_marked": newly_marked,
             "gap_fills": gap_fills, "data_errors": data_errors, "halted": False}
+
+def process_entries(storage, market_data, executor, today: str, config) -> dict:
+    if storage.get_kill_switch():
+        return {"filled": [], "gap_fills": [], "data_errors": [], "halted": True}
+
+    pending = storage.get_pending_orders()
+    filled = []
+    gap_fills = []
+    data_errors = []
+
+    for order in pending:
+        try:
+            bar = market_data.get_daily_bar(order.symbol, today)
+        except DataUnavailableError as error:
+            data_errors.append(str(error))
+            continue
+
+        if bar.high >= order.pivot_price:
+            fill_price = bar.open if bar.open > order.pivot_price else order.pivot_price
+            executor.submit_entry(symbol=order.symbol, quantity=order.quantity,
+                                   fill_price=fill_price, rs_rating=order.rs_at_selection,
+                                   pivot_price=order.pivot_price, entry_date=today)
+            storage.remove_pending_order(order.id)
+            filled.append({"symbol": order.symbol, "fill_price": fill_price,
+                            "quantity": order.quantity})
+            if detect_gap(order.pivot_price, fill_price, config.gap_threshold_pct):
+                gap_fills.append({"symbol": order.symbol, "pivot_price": order.pivot_price,
+                                   "fill_price": fill_price})
+        else:
+            storage.increment_pending_order_wait(order.id)
+            if order.sessions_waited + 1 >= config.pending_order_expiry_sessions:
+                storage.remove_pending_order(order.id)
+
+    return {"filled": filled, "gap_fills": gap_fills, "data_errors": data_errors,
+            "halted": False}

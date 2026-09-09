@@ -38,6 +38,16 @@ def test_submit_exit_removes_position_credits_cash_and_logs_trade(storage):
     assert storage.get_open_positions() == []
     assert len(storage.get_trade_log()) == 1
 
+def test_submit_entry_uses_configured_hard_stop_pct(storage):
+    executor = PaperExecutor(storage, hard_stop_pct=0.05)
+
+    position = executor.submit_entry(
+        symbol="INFY", quantity=10, fill_price=1500.0, rs_rating=88,
+        pivot_price=1490.0, entry_date="2026-01-05",
+    )
+
+    assert position.hard_stop == pytest.approx(1500.0 * 0.95)
+
 def test_kite_live_executor_not_implemented():
     executor = KiteLiveExecutor()
     with pytest.raises(NotImplementedError):

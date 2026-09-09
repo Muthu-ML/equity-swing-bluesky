@@ -5,6 +5,9 @@ from bot.workflow import process_exits, process_entries, select_and_queue_candid
 
 def print_summary(summary: dict, print_fn=print) -> None:
     print_fn(f"\n=== Daily Summary: {summary['date']} ===")
+    if summary.get("new_orders_halted"):
+        print_fn("KILL SWITCH IS ON — no new entries were evaluated or placed today. "
+                  "Exits were processed normally.")
     print_fn(f"Equity: {summary['current_equity']:.2f}  Drawdown: {summary['drawdown_pct']:.2f}%")
     print_fn(f"Entries filled: {summary['entries_filled']}")
     print_fn(f"Gap fills: {summary['gap_fills']}")
@@ -30,6 +33,17 @@ def run_daily_cycle(storage, market_data, executor, strategy_config,
         for problem in problems:
             print_fn(f"  - {problem}")
         return {"halted": True, "reconciliation_problems": problems}
+
+    latest_date = storage.get_latest_equity_date()
+    if latest_date == today:
+        confirm = input_fn(
+            f"WARNING: the daily cycle already ran today ({today}). Running it again will "
+            f"double-count pending-order wait counters and equity history. "
+            f"Type 'yes' to proceed anyway, anything else to abort: "
+        )
+        if confirm.strip().lower() != "yes":
+            print_fn("Aborted — daily cycle already ran today.")
+            return {"halted": True, "already_ran_today": True}
 
     exit_result = process_exits(storage, market_data, executor, today, strategy_config)
     entry_result = process_entries(storage, market_data, executor, today, strategy_config)

@@ -82,6 +82,15 @@ def test_equity_history_and_peak(storage):
     assert storage.get_latest_equity() == (1050000.0, 900000.0)
     assert storage.get_equity_peak() == 1050000.0
 
+def test_get_latest_equity_date_returns_most_recent(storage):
+    storage.record_equity("2026-01-05", 1000000.0, 1000000.0)
+    storage.record_equity("2026-01-06", 1050000.0, 900000.0)
+
+    assert storage.get_latest_equity_date() == "2026-01-06"
+
+def test_get_latest_equity_date_empty_table_returns_none(storage):
+    assert storage.get_latest_equity_date() is None
+
 def test_kill_switch_default_and_toggle(storage):
     assert storage.get_kill_switch() is False
 

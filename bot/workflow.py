@@ -6,10 +6,11 @@ from bot.sizing import compute_position_size
 from bot.risk_controls import check_daily_loss_limit
 
 def process_exits(storage, market_data, executor, today: str, config) -> dict:
-    if storage.get_kill_switch():
-        return {"executed_exits": [], "newly_marked": [], "gap_fills": [],
-                 "data_errors": [], "halted": True}
-
+    # NOTE: the kill switch intentionally does NOT gate this function. Per the source
+    # spec's §6 kill-switch definition, it halts "all new order placement" only —
+    # exit/stop-loss management must keep running even when the kill switch is on,
+    # otherwise a daily-loss-triggered kill switch would stop managing the very
+    # positions causing the loss.
     positions = storage.get_open_positions()
     executed_exits = []
     gap_fills = []
@@ -160,8 +161,12 @@ def build_daily_summary(storage, market_data, today: str, exit_result: dict,
         if daily_loss_limit_breached:
             storage.set_kill_switch(True)
 
+    new_orders_halted = entry_result.get("halted", False) or selection_result.get("halted", False)
+
     return {
         "date": today,
+        "halted": False,
+        "new_orders_halted": new_orders_halted,
         "entries_filled": entry_result.get("filled", []),
         "gap_fills": entry_result.get("gap_fills", []),
         "exits_executed": exit_result.get("executed_exits", []),

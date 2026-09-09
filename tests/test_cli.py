@@ -62,6 +62,50 @@ def test_run_daily_cycle_halts_on_reconciliation_problem(storage):
     assert len(remaining) == 1
     assert remaining[0].quantity == 0  # untouched, not silently dropped or corrected
 
+def test_run_daily_cycle_second_run_same_day_aborts_without_confirmation(storage):
+    config = make_config()
+
+    # First run establishes today's equity record.
+    first_inputs = iter(["done"])
+    run_daily_cycle(storage, FakeMarketData(), FakeExecutor(), config,
+                     input_fn=lambda _: next(first_inputs), print_fn=lambda _: None)
+
+    call_count = {"n": 0}
+
+    def confirm_then_fail(_prompt):
+        call_count["n"] += 1
+        if call_count["n"] > 1:
+            raise AssertionError("should not prompt again after aborting same-day rerun")
+        return "no"
+
+    prints = []
+    result = run_daily_cycle(
+        storage, FakeMarketData(), FakeExecutor(), config,
+        input_fn=confirm_then_fail, print_fn=prints.append,
+    )
+
+    assert result == {"halted": True, "already_ran_today": True}
+    assert any("Aborted" in message for message in prints)
+    assert call_count["n"] == 1  # never reached prompt_for_candidates or beyond
+
+def test_run_daily_cycle_second_run_same_day_proceeds_with_yes_confirmation(storage):
+    config = make_config()
+
+    first_inputs = iter(["done"])
+    run_daily_cycle(storage, FakeMarketData(), FakeExecutor(), config,
+                     input_fn=lambda _: next(first_inputs), print_fn=lambda _: None)
+
+    second_inputs = iter(["yes", "done"])
+    prints = []
+    result = run_daily_cycle(
+        storage, FakeMarketData(), FakeExecutor(), config,
+        input_fn=lambda _: next(second_inputs), print_fn=prints.append,
+    )
+
+    assert "already_ran_today" not in result
+    assert result["halted"] is False
+    assert any("Daily Summary" in message for message in prints)
+
 def test_print_summary_includes_key_fields():
     prints = []
     print_summary({
@@ -72,6 +116,17 @@ def test_print_summary_includes_key_fields():
     }, print_fn=prints.append)
     assert any("2026-01-06" in message for message in prints)
     assert any("1000000" in message for message in prints)
+
+def test_print_summary_shows_kill_switch_banner_when_new_orders_halted():
+    prints = []
+    print_summary({
+        "date": "2026-01-06", "current_equity": 1000000.0, "drawdown_pct": 0.0,
+        "new_orders_halted": True,
+        "entries_filled": [], "gap_fills": [], "exits_executed": [], "exits_marked": [],
+        "exit_gap_fills": [], "candidates_queued": [], "candidates_skipped": [],
+        "data_errors": [], "daily_loss_limit_breached": False,
+    }, print_fn=prints.append)
+    assert any("KILL SWITCH IS ON" in message for message in prints)
 
 def test_main_menu_view_positions_then_exit(storage):
     inputs = iter(["2", "5"])

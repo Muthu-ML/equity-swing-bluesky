@@ -175,6 +175,12 @@ class Storage:
         ).fetchone()
         return (row["equity"], row["cash"]) if row else None
 
+    def get_latest_equity_date(self) -> str | None:
+        row = self._conn.execute(
+            "SELECT date FROM equity_history ORDER BY id DESC LIMIT 1"
+        ).fetchone()
+        return row["date"] if row else None
+
     def get_equity_peak(self) -> float:
         row = self._conn.execute("SELECT MAX(equity) AS peak FROM equity_history").fetchone()
         return row["peak"] if row and row["peak"] is not None else 0.0

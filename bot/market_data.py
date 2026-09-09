@@ -31,10 +31,12 @@ class KiteMarketData:
             raise DataUnavailableError(f"{symbol}: not found in NSE instrument list")
         return self._token_cache[symbol]
 
-    def get_daily_bar(self, symbol: str, as_of_date: date) -> DailyBar:
+    def get_daily_bar(self, symbol: str, as_of_date) -> DailyBar:
         instrument_token = self.resolve_instrument_token(symbol)
-        from_date = as_of_date - timedelta(days=90)
         try:
+            if isinstance(as_of_date, str):
+                as_of_date = date.fromisoformat(as_of_date)
+            from_date = as_of_date - timedelta(days=90)
             candles = self._kite.historical_data(instrument_token, from_date, as_of_date, "day")
             if len(candles) < 50:
                 raise DataUnavailableError(

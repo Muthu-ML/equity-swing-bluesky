@@ -14,8 +14,9 @@ class BrokerExecutor(ABC):
         ...
 
 class PaperExecutor(BrokerExecutor):
-    def __init__(self, storage: Storage):
+    def __init__(self, storage: Storage, hard_stop_pct: float = 0.07):
         self._storage = storage
+        self._hard_stop_pct = hard_stop_pct
 
     def submit_entry(self, symbol: str, quantity: int, fill_price: float, rs_rating: int,
                       pivot_price: float, entry_date: str) -> Position:
@@ -24,7 +25,8 @@ class PaperExecutor(BrokerExecutor):
 
         position = Position(
             id=None, symbol=symbol, entry_date=entry_date, entry_price=fill_price,
-            quantity=quantity, rs_at_entry=rs_rating, hard_stop=fill_price * 0.93,
+            quantity=quantity, rs_at_entry=rs_rating,
+            hard_stop=fill_price * (1 - self._hard_stop_pct),
             trailing_active=False, pivot_price=pivot_price,
         )
         position.id = self._storage.add_position(position)

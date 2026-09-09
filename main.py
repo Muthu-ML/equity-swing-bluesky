@@ -21,7 +21,7 @@ def main():
                                strategy_config.starting_capital)
 
     market_data = KiteMarketData(kite_client)
-    executor = PaperExecutor(storage)
+    executor = PaperExecutor(storage, hard_stop_pct=strategy_config.hard_stop_pct)
 
     try:
         main_menu(storage, market_data, executor, strategy_config, kite_client, kite_config)

@@ -45,11 +45,24 @@ def storage(tmp_path):
     yield s
     s.close()
 
-def test_kill_switch_halts_processing(storage):
+def test_kill_switch_does_not_halt_exit_processing(storage):
+    # Kill switch halts NEW order placement (entries/candidate selection) only, per
+    # source-spec §6 — exits must keep being evaluated/executed even when it's on.
+    position = Position(id=None, symbol="INFY", entry_date="2026-01-01", entry_price=1500.0,
+                         quantity=10, rs_at_entry=88, hard_stop=1395.0, trailing_active=False,
+                         pivot_price=1490.0, exit_pending=True, exit_reason="hard_stop",
+                         exit_trigger_price=1395.0)
+    storage.add_position(position)
+    market_data = FakeMarketData(bars={"INFY": Bar(1380.0, 1390.0, 1370.0, 1385.0, 1420.0)})
+    executor = FakeExecutor()
     storage.set_kill_switch(True)
-    result = process_exits(storage, FakeMarketData(), FakeExecutor(), "2026-01-06", make_config())
-    assert result["halted"] is True
-    assert result["executed_exits"] == []
+
+    result = process_exits(storage, market_data, executor, "2026-01-06", make_config())
+
+    assert result["halted"] is False
+    assert executor.exit_calls == [("INFY", 1380.0, "hard_stop")]
+    assert result["executed_exits"][0]["exit_price"] == 1380.0
+    assert storage.get_open_positions() == []
 
 def test_executes_previously_marked_exit_at_todays_open(storage):
     position = Position(id=None, symbol="INFY", entry_date="2026-01-01", entry_price=1500.0,

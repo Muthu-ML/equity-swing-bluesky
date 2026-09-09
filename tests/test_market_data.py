@@ -87,6 +87,25 @@ def test_resolve_instrument_token_cached_after_first_lookup():
     client._instruments = []  # simulate the API becoming unavailable
     assert market_data.resolve_instrument_token("INFY") == 1
 
+def test_get_daily_bar_accepts_iso_string_date():
+    # Regression test: bot/workflow.py always passes `today` as a str (from
+    # date.today().isoformat()), never a date object. get_daily_bar must accept it.
+    candles = make_candles(50, base_close=100.0)
+    client = FakeKiteClient(
+        instruments=[{"tradingsymbol": "INFY", "instrument_token": 1}],
+        candles=candles,
+    )
+    market_data = KiteMarketData(client)
+
+    bar = market_data.get_daily_bar("INFY", "2026-01-05")
+
+    expected_ma = sum(c["close"] for c in candles) / 50
+    assert bar.close == candles[-1]["close"]
+    assert bar.open == candles[-1]["open"]
+    assert bar.high == candles[-1]["high"]
+    assert bar.low == candles[-1]["low"]
+    assert bar.ma_50 == expected_ma
+
 def test_resolve_instrument_token_malformed_row_raises_data_unavailable():
     # Instrument row missing "tradingsymbol" key
     client = FakeKiteClient(instruments=[{"instrument_token": 1}])

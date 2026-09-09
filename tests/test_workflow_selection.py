@@ -159,3 +159,30 @@ def test_build_daily_summary_no_prior_equity_does_not_breach(storage):
     )
 
     assert summary["daily_loss_limit_breached"] is False
+
+def test_build_daily_summary_always_includes_halted_false(storage):
+    market_data = FakeMarketData()
+
+    summary = build_daily_summary(
+        storage, market_data, "2026-01-06",
+        exit_result={"executed_exits": [], "newly_marked": [], "data_errors": []},
+        entry_result={"filled": [], "gap_fills": [], "data_errors": []},
+        selection_result={"selected": [], "skipped": []},
+        config=make_config(),
+    )
+
+    assert summary["halted"] is False
+    assert summary["new_orders_halted"] is False
+
+def test_build_daily_summary_flags_new_orders_halted_when_entries_halted(storage):
+    market_data = FakeMarketData()
+
+    summary = build_daily_summary(
+        storage, market_data, "2026-01-06",
+        exit_result={"executed_exits": [], "newly_marked": [], "data_errors": []},
+        entry_result={"filled": [], "gap_fills": [], "data_errors": [], "halted": True},
+        selection_result={"selected": [], "skipped": [], "halted": True},
+        config=make_config(),
+    )
+
+    assert summary["new_orders_halted"] is True

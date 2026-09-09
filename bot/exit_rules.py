@@ -9,9 +9,7 @@ class ExitDecision:
     reason: str | None
 
 def evaluate_exit(position: Position, today_close: float, today_50dma: float) -> ExitDecision:
-    # Activate trailing only if in profit (close >= entry_price) AND close > MA
-    should_activate_trailing = (today_close >= position.entry_price) and (today_close > today_50dma)
-    trailing_active = position.trailing_active or should_activate_trailing
+    trailing_active = position.trailing_active or (today_close > today_50dma)
 
     if trailing_active:
         should_exit = today_close < today_50dma

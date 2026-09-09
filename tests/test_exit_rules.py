@@ -10,14 +10,14 @@ def make_position(hard_stop=930.0, trailing_active=False):
 
 def test_not_activated_close_above_hard_stop_no_exit():
     position = make_position()
-    decision = evaluate_exit(position, today_close=950.0, today_50dma=900.0)
+    decision = evaluate_exit(position, today_close=950.0, today_50dma=980.0)
     assert decision.should_exit is False
     assert decision.trailing_active is False
     assert decision.reason is None
 
 def test_not_activated_close_below_hard_stop_exits():
     position = make_position()
-    decision = evaluate_exit(position, today_close=920.0, today_50dma=900.0)
+    decision = evaluate_exit(position, today_close=920.0, today_50dma=950.0)
     assert decision.should_exit is True
     assert decision.reason == "hard_stop"
     assert decision.stop_level == 930.0

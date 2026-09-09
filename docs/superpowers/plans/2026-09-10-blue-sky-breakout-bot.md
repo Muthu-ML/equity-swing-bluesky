@@ -728,15 +728,19 @@ def make_position(hard_stop=930.0, trailing_active=False):
     )
 
 def test_not_activated_close_above_hard_stop_no_exit():
+    # MA (980) is kept ABOVE today's close (950) so trailing does NOT activate —
+    # this test is specifically for the pre-activation fixed-hard-stop branch.
     position = make_position()
-    decision = evaluate_exit(position, today_close=950.0, today_50dma=900.0)
+    decision = evaluate_exit(position, today_close=950.0, today_50dma=980.0)
     assert decision.should_exit is False
     assert decision.trailing_active is False
     assert decision.reason is None
 
 def test_not_activated_close_below_hard_stop_exits():
+    # MA (950) is kept ABOVE today's close (920) so trailing does NOT activate —
+    # the exit here must come from the fixed hard stop, not the MA trail.
     position = make_position()
-    decision = evaluate_exit(position, today_close=920.0, today_50dma=900.0)
+    decision = evaluate_exit(position, today_close=920.0, today_50dma=950.0)
     assert decision.should_exit is True
     assert decision.reason == "hard_stop"
     assert decision.stop_level == 930.0
@@ -1195,34 +1199,35 @@ class KiteMarketData:
             return self._token_cache[symbol]
         try:
             instruments = self._kite.instruments("NSE")
+            for row in instruments:
+                self._token_cache[row["tradingsymbol"]] = row["instrument_token"]
         except Exception as error:
             raise DataUnavailableError(f"{symbol}: instrument lookup failed: {error}") from error
-
-        for row in instruments:
-            self._token_cache[row["tradingsymbol"]] = row["instrument_token"]
 
         if symbol not in self._token_cache:
             raise DataUnavailableError(f"{symbol}: not found in NSE instrument list")
         return self._token_cache[symbol]
 
-    def get_daily_bar(self, symbol: str, as_of_date: date) -> DailyBar:
+    def get_daily_bar(self, symbol: str, as_of_date) -> DailyBar:
         instrument_token = self.resolve_instrument_token(symbol)
-        from_date = as_of_date - timedelta(days=90)
         try:
+            if isinstance(as_of_date, str):
+                as_of_date = date.fromisoformat(as_of_date)
+            from_date = as_of_date - timedelta(days=90)
             candles = self._kite.historical_data(instrument_token, from_date, as_of_date, "day")
+            if len(candles) < 50:
+                raise DataUnavailableError(
+                    f"{symbol}: insufficient history ({len(candles)} candles, need 50)"
+                )
+            last_50 = candles[-50:]
+            ma_50 = sum(c["close"] for c in last_50) / 50
+            today = candles[-1]
+            return DailyBar(open=today["open"], high=today["high"], low=today["low"],
+                             close=today["close"], ma_50=ma_50)
+        except DataUnavailableError:
+            raise
         except Exception as error:
             raise DataUnavailableError(f"{symbol}: historical data fetch failed: {error}") from error
-
-        if len(candles) < 50:
-            raise DataUnavailableError(
-                f"{symbol}: insufficient history ({len(candles)} candles, need 50)"
-            )
-
-        last_50 = candles[-50:]
-        ma_50 = sum(c["close"] for c in last_50) / 50
-        today = candles[-1]
-        return DailyBar(open=today["open"], high=today["high"], low=today["low"],
-                         close=today["close"], ma_50=ma_50)
 ```
 
 - [ ] **Step 4: Run test to verify it passes**
@@ -1576,6 +1581,7 @@ def process_exits(storage, market_data, executor, today: str, config) -> dict:
 
         trade = executor.submit_exit(position, exit_price=bar.open, exit_date=today,
                                       reason=position.exit_reason)
+        storage.remove_position(position.id)
         executed_exits.append({"symbol": position.symbol, "exit_price": bar.open,
                                 "reason": position.exit_reason, "return_pct": trade.return_pct})
         if detect_gap(position.exit_trigger_price, bar.open, config.gap_threshold_pct):

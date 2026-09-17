@@ -10,6 +10,9 @@ class FakeMarketData:
 class FakeExecutor:
     pass
 
+def fail_if_called(_prompt):
+    raise AssertionError("should not prompt for input in this scenario")
+
 @pytest.fixture
 def storage(tmp_path):
     s = Storage(str(tmp_path / "test.db"))
@@ -21,23 +24,49 @@ def make_config(**overrides):
     defaults = dict(starting_capital=1000000.0, risk_per_trade_pct=0.01, max_positions=8,
                      position_cap_pct=0.30, hard_stop_pct=0.07, rs_floor=70,
                      pending_order_expiry_sessions=5, daily_loss_limit_pct=0.03,
-                     gap_threshold_pct=0.02)
+                     gap_threshold_pct=0.02,
+                     candidates_file_path="test_no_candidates_file.csv")
     defaults.update(overrides)
     return StrategyConfig(**defaults)
 
+def write_csv(path, rows, header="symbol,pivot_price,rs_rating"):
+    with open(path, "w", newline="") as f:
+        f.write(header + "\n")
+        for row in rows:
+            f.write(row + "\n")
+
 def test_run_daily_cycle_with_no_open_positions_and_no_candidates(storage):
-    inputs = iter(["done"])
     prints = []
 
     summary = run_daily_cycle(
         storage, FakeMarketData(), FakeExecutor(), make_config(),
-        input_fn=lambda _: next(inputs), print_fn=prints.append,
+        input_fn=fail_if_called, print_fn=prints.append,
     )
 
     assert summary["entries_filled"] == []
     assert summary["exits_executed"] == []
     assert summary["current_equity"] == 1000000.0
     assert any("Daily Summary" in message for message in prints)
+    assert any("No candidates file found" in message for message in prints)
+
+def test_run_daily_cycle_reads_candidates_from_configured_file(storage, tmp_path):
+    file_path = str(tmp_path / "candidates.csv")
+    write_csv(file_path, ["INFY,1490.0,88"])
+    config = make_config(candidates_file_path=file_path)
+
+    summary = run_daily_cycle(
+        storage, FakeMarketData(), FakeExecutor(), config,
+        input_fn=fail_if_called, print_fn=lambda _: None,
+    )
+
+    # equity=1,000,000; risk_amount=10,000; position_value=10,000/0.07=142,857.14
+    # (cap of 300,000 doesn't bind); quantity=floor(142,857.14/1490)=95
+    assert summary["candidates_queued"] == [
+        {"symbol": "INFY", "quantity": 95, "pivot_price": 1490.0}
+    ]
+    pending = storage.get_pending_orders()
+    assert len(pending) == 1
+    assert pending[0].symbol == "INFY"
 
 def test_run_daily_cycle_halts_on_reconciliation_problem(storage):
     from bot.models import Position
@@ -45,9 +74,6 @@ def test_run_daily_cycle_halts_on_reconciliation_problem(storage):
                              quantity=0, rs_at_entry=80, hard_stop=93.0, trailing_active=False,
                              pivot_price=99.0)
     storage.add_position(bad_position)
-
-    def fail_if_called(_prompt):
-        raise AssertionError("should not prompt for candidates when reconciliation halts")
 
     prints = []
 
@@ -66,9 +92,8 @@ def test_run_daily_cycle_second_run_same_day_aborts_without_confirmation(storage
     config = make_config()
 
     # First run establishes today's equity record.
-    first_inputs = iter(["done"])
     run_daily_cycle(storage, FakeMarketData(), FakeExecutor(), config,
-                     input_fn=lambda _: next(first_inputs), print_fn=lambda _: None)
+                     input_fn=fail_if_called, print_fn=lambda _: None)
 
     call_count = {"n": 0}
 
@@ -86,16 +111,15 @@ def test_run_daily_cycle_second_run_same_day_aborts_without_confirmation(storage
 
     assert result == {"halted": True, "already_ran_today": True}
     assert any("Aborted" in message for message in prints)
-    assert call_count["n"] == 1  # never reached prompt_for_candidates or beyond
+    assert call_count["n"] == 1  # never reached candidate reading or beyond
 
 def test_run_daily_cycle_second_run_same_day_proceeds_with_yes_confirmation(storage):
     config = make_config()
 
-    first_inputs = iter(["done"])
     run_daily_cycle(storage, FakeMarketData(), FakeExecutor(), config,
-                     input_fn=lambda _: next(first_inputs), print_fn=lambda _: None)
+                     input_fn=fail_if_called, print_fn=lambda _: None)
 
-    second_inputs = iter(["yes", "done"])
+    second_inputs = iter(["yes"])
     prints = []
     result = run_daily_cycle(
         storage, FakeMarketData(), FakeExecutor(), config,

@@ -30,7 +30,7 @@ def make_config(**overrides):
     defaults = dict(starting_capital=1000000.0, risk_per_trade_pct=0.01, max_positions=8,
                      position_cap_pct=0.30, hard_stop_pct=0.07, rs_floor=70,
                      pending_order_expiry_sessions=5, daily_loss_limit_pct=0.03,
-                     gap_threshold_pct=0.02)
+                     gap_threshold_pct=0.02, candidates_file_path="candidates.csv")
     defaults.update(overrides)
     return StrategyConfig(**defaults)
 
@@ -60,9 +60,9 @@ def test_compute_current_equity_falls_back_to_entry_price_on_data_error(storage)
 
 def test_select_and_queue_ranks_by_rs_and_respects_open_slots(storage):
     candidates = [
-        Candidate(symbol="A", pivot_price=100.0, rs_rating=80, current_price=101.0, ma_50=90.0),
-        Candidate(symbol="B", pivot_price=200.0, rs_rating=95, current_price=201.0, ma_50=180.0),
-        Candidate(symbol="C", pivot_price=300.0, rs_rating=72, current_price=301.0, ma_50=280.0),
+        Candidate(symbol="A", pivot_price=100.0, rs_rating=80),
+        Candidate(symbol="B", pivot_price=200.0, rs_rating=95),
+        Candidate(symbol="C", pivot_price=300.0, rs_rating=72),
     ]
     config = make_config(max_positions=2)
     market_data = FakeMarketData()
@@ -80,8 +80,8 @@ def test_select_and_queue_drops_below_rs_floor_and_already_held(storage):
                                             rs_at_selection=80, order_date="2026-01-05",
                                             quantity=5))
     candidates = [
-        Candidate(symbol="A", pivot_price=100.0, rs_rating=80, current_price=101.0, ma_50=90.0),
-        Candidate(symbol="D", pivot_price=50.0, rs_rating=60, current_price=51.0, ma_50=45.0),
+        Candidate(symbol="A", pivot_price=100.0, rs_rating=80),
+        Candidate(symbol="D", pivot_price=50.0, rs_rating=60),
     ]
     config = make_config(max_positions=8, rs_floor=70)
     market_data = FakeMarketData()
@@ -97,7 +97,7 @@ def test_select_and_queue_no_open_slots_returns_all_skipped(storage):
                                        entry_price=100.0, quantity=1, rs_at_entry=80,
                                        hard_stop=93.0, trailing_active=False, pivot_price=99.0))
     candidates = [
-        Candidate(symbol="A", pivot_price=100.0, rs_rating=80, current_price=101.0, ma_50=90.0),
+        Candidate(symbol="A", pivot_price=100.0, rs_rating=80),
     ]
     config = make_config(max_positions=2)
     market_data = FakeMarketData()

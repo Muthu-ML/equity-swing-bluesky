@@ -5,7 +5,7 @@ def test_load_strategy_config_defaults(monkeypatch):
     for var in ["STARTING_CAPITAL", "RISK_PER_TRADE_PCT", "MAX_POSITIONS",
                 "POSITION_CAP_PCT", "HARD_STOP_PCT", "RS_FLOOR",
                 "PENDING_ORDER_EXPIRY_SESSIONS", "DAILY_LOSS_LIMIT_PCT",
-                "GAP_THRESHOLD_PCT"]:
+                "GAP_THRESHOLD_PCT", "CANDIDATES_FILE_PATH"]:
         monkeypatch.delenv(var, raising=False)
 
     config = load_strategy_config()
@@ -19,15 +19,18 @@ def test_load_strategy_config_defaults(monkeypatch):
     assert config.pending_order_expiry_sessions == 5
     assert config.daily_loss_limit_pct == 0.03
     assert config.gap_threshold_pct == 0.02
+    assert config.candidates_file_path == "candidates.csv"
 
 def test_load_strategy_config_overrides(monkeypatch):
     monkeypatch.setenv("STARTING_CAPITAL", "500000")
     monkeypatch.setenv("RS_FLOOR", "85")
+    monkeypatch.setenv("CANDIDATES_FILE_PATH", "data/candidates.csv")
 
     config = load_strategy_config()
 
     assert config.starting_capital == 500000.0
     assert config.rs_floor == 85
+    assert config.candidates_file_path == "data/candidates.csv"
 
 def test_load_kite_config_reads_env(monkeypatch):
     monkeypatch.setenv("KITE_API_KEY", "abc")

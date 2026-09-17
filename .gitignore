@@ -1,5 +1,6 @@
 .env
 bot_state.db
+candidates.csv
 __pycache__/
 *.pyc
 .pytest_cache/

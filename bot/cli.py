@@ -1,5 +1,5 @@
 from datetime import date
-from bot.candidate_input import prompt_for_candidates
+from bot.candidate_input import read_candidates_from_file
 from bot.risk_controls import reconcile_positions
 from bot.workflow import process_exits, process_entries, select_and_queue_candidates, build_daily_summary
 
@@ -49,8 +49,9 @@ def run_daily_cycle(storage, market_data, executor, strategy_config,
     entry_result = process_entries(storage, market_data, executor, today, strategy_config)
 
     if not entry_result["halted"]:
-        print_fn("Enter today's Fresh Breakout candidates for open slots.")
-        candidates = prompt_for_candidates(input_fn, print_fn)
+        candidates = read_candidates_from_file(
+            strategy_config.candidates_file_path, today, input_fn, print_fn
+        )
         selection_result = select_and_queue_candidates(
             storage, market_data, candidates, today, strategy_config
         )

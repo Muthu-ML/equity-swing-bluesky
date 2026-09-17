@@ -5,8 +5,6 @@ class Candidate:
     symbol: str
     pivot_price: float
     rs_rating: int
-    current_price: float
-    ma_50: float
 
 @dataclass
 class PendingOrder:

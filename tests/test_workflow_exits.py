@@ -9,7 +9,7 @@ def make_config(**overrides):
     defaults = dict(starting_capital=1000000.0, risk_per_trade_pct=0.01, max_positions=8,
                      position_cap_pct=0.30, hard_stop_pct=0.07, rs_floor=70,
                      pending_order_expiry_sessions=5, daily_loss_limit_pct=0.03,
-                     gap_threshold_pct=0.02)
+                     gap_threshold_pct=0.02, candidates_file_path="candidates.csv")
     defaults.update(overrides)
     return StrategyConfig(**defaults)
 

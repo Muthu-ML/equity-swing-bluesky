@@ -14,6 +14,7 @@ class StrategyConfig:
     pending_order_expiry_sessions: int
     daily_loss_limit_pct: float
     gap_threshold_pct: float
+    candidates_file_path: str
 
 @dataclass
 class KiteConfig:
@@ -38,6 +39,7 @@ def load_strategy_config() -> StrategyConfig:
         pending_order_expiry_sessions=int(os.getenv("PENDING_ORDER_EXPIRY_SESSIONS", "5")),
         daily_loss_limit_pct=float(os.getenv("DAILY_LOSS_LIMIT_PCT", "0.03")),
         gap_threshold_pct=float(os.getenv("GAP_THRESHOLD_PCT", "0.02")),
+        candidates_file_path=os.getenv("CANDIDATES_FILE_PATH", "candidates.csv"),
     )
 
 def load_kite_config() -> KiteConfig:

@@ -14,10 +14,16 @@ placed in this phase.
    login URL, you log in via Zerodha in your browser, then paste the
    `request_token` from the redirect URL back into the console. This is
    required once per day (Kite access tokens expire daily).
-5. Choose `1) Run daily cycle` each evening after market close. You'll be
-   prompted to type in that day's Blue Sky Fresh Breakout candidates
-   (symbol, pivot price, RS rating, current price, 50-day MA) as read from
-   bananapatterns.com yourself.
+5. Before running the daily cycle, update `candidates.csv` (path configurable
+   via `CANDIDATES_FILE_PATH`) with that day's Blue Sky Fresh Breakout
+   candidates, read off bananapatterns.com yourself. Header row required:
+   ```
+   symbol,pivot_price,rs_rating
+   INFY,1490.0,88
+   ```
+   The file must be saved/modified *today* — the bot checks its last-modified
+   date and will ask you to confirm before using a stale file.
+6. Choose `1) Run daily cycle` each evening after market close.
 
 ## What this does NOT do (yet)
 
